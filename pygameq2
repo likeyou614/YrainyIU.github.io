@@ -1,0 +1,149 @@
+import pygame
+import random
+import os
+
+
+# set up a window size
+WIDTH = 288
+HEIGHT = 512
+
+# set up background
+BACKGROUND_IMG = pygame.image.load(os.path.join("C:/Users/94457/pygameTX/assets/", "background-day.png"))
+
+# set up bird
+BIRD_IMG = pygame.image.load(os.path.join("C:/Users/94457/pygameTX/assets/", "yellowbird-midflap.png"))
+BIRD_WIDTH = BIRD_IMG.get_width()
+BIRD_HEIGHT = BIRD_IMG.get_height()
+
+# set up pipes
+PIPE_IMG = pygame.image.load(os.path.join("C:/Users/94457/pygameTX/assets/", "pipe-green.png"))
+PIPE_WIDTH = PIPE_IMG.get_width()
+
+class Bird:
+    def __init__(self):
+        self.x = 50
+        self.y = 200
+        self.vel_y = 0
+        self.img = BIRD_IMG
+        self.fly = [pygame.transform.rotate(self.img, -90),
+                    pygame.transform.rotate(self.img, -60),
+                    pygame.transform.rotate(self.img, -30),
+                    self.img,
+                    pygame.transform.rotate(self.img, 30),
+                    pygame.transform.rotate(self.img, 60),
+                    pygame.transform.rotate(self.img, 90)]
+        self.fly_index = 0
+        self.animation_time = pygame.time.get_ticks()
+        self.rect = pygame.Rect(self.x, self.y, BIRD_WIDTH, BIRD_HEIGHT)
+
+    def draw(self, screen):
+        screen.blit(self.fly[self.fly_index], (self.x, self.y))
+
+    def update(self):
+        self.update_flying_animation()
+        self.vel_y += 1.5
+        self.y += self.vel_y
+        self.rect.y = self.y
+
+    def update_flying_animation(self):
+        if pygame.time.get_ticks() - self.animation_time > 80:
+            self.fly_index = (self.fly_index + 1) % len(self.fly)
+            self.animation_time = pygame.time.get_ticks()
+
+    def jump(self):
+        self.vel_y = -20
+
+class Pipe:
+    def __init__(self, x):
+        self.top_img = pygame.transform.flip(PIPE_IMG, False, True)
+        self.bottom_img = PIPE_IMG
+        self.x = x
+        self.top_y = random.randint(-250, -50)
+        self.bottom_y = self.top_y + 400
+        self.passed = False
+        self.rect_top = pygame.Rect(self.x, self.top_y, PIPE_WIDTH, 320)
+        self.rect_bottom = pygame.Rect(self.x, self.bottom_y, PIPE_WIDTH, 320)
+
+    def draw(self, screen):
+        screen.blit(self.top_img, (self.x, self.top_y))
+        screen.blit(self.bottom_img, (self.x, self.bottom_y))
+
+    def update(self):
+        self.x -= 2
+        self.rect_top.x = self.x
+        self.rect_bottom.x = self.x
+
+class Game:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("Flappy Bird")
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.Font('freesansbold.ttf', 32)
+        self.score = 0
+        self.high_score = 0
+        self.bird = Bird()
+        self.pipes = [Pipe(400), Pipe(600), Pipe(800)]
+        # set up sounds
+        self.point_sound = pygame.mixer.Sound(os.path.join("C:/Users/94457/pygameTX/assets/", "point.wav"))
+        self.game_over_sound = pygame.mixer.Sound(os.path.join("C:/Users/94457/pygameTX/assets/", "die.wav"))
+
+    def run(self):
+        game_over = False
+
+        while not game_over:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    game_over = True
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        self.bird.jump()
+
+            self.screen.blit(BACKGROUND_IMG, (0, 0))
+            self.draw_score()
+            self.update_pipes()
+            self.bird.update()
+            self.bird.draw(self.screen)
+
+            if self.check_collision():
+                game_over = True
+
+            pygame.display.update()
+            self.clock.tick(60)
+
+        pygame.quit()
+
+    def update_pipes(self):
+        for pipe in self.pipes:
+            pipe.update()
+            if pipe.x < -PIPE_WIDTH:
+                self.pipes.remove(pipe)
+                self.pipes.append(Pipe(500))
+                self.score += 1
+                self.high_score = max(self.high_score, self.score)
+            if not pipe.passed and pipe.x < self.bird.x:
+                pipe.passed = True
+
+            pipe.draw(self.screen)
+
+    def draw_score(self):
+        self.score_font = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
+        self.high_score_font = self.font.render(f"High Score: {self.high_score}", True, (255, 255, 255))
+        self.screen.blit(self.score_font, (10, 10))
+        self.screen.blit(self.high_score_font, (10, 50))
+
+    def check_collision(self):
+        if self.bird.rect.bottom >= HEIGHT - 1:
+            self.game_over_sound.play()
+            return True
+
+        for pipe in self.pipes:
+            if self.bird.rect.colliderect(pipe.rect_top) or self.bird.rect.colliderect(pipe.rect_bottom):
+                self.game_over_sound.play()
+                return True
+
+        return False
+
+if __name__ == "__main__":
+    game = Game()
+    game.run()
